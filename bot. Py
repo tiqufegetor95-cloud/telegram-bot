@@ -1,0 +1,237 @@
+import time
+import json
+import urllib.request
+import urllib.parse
+import random
+import datetime
+
+# --- CONFIGURATION & TOKENS ---
+MAIN_BOT_TOKEN = "8762942294:AAHVBwmw7TMv5VWFSob4NWOlsSC6_tgoXtg"
+SUPPORT_BOT_TOKEN = "8655008596:AAHw46l4NAUqX7mNJZfy3kOGPxHGvTr89ho"
+
+ADMIN_ID = 7474762145
+ADMIN_USERNAME = "@TamimLidarvip"
+PAYMENT_GROUP = "https://t.me/paymeuntGorupbd"
+STATS_CHANNEL = "@tyfsrujfrhvc"
+SUPPORT_BOT_LINK = "https://t.me/Livecat2capcabot"
+
+# --- PAYMENT NUMBERS ---
+BKASH_NUMBER = "01963530219"
+NAGAD_NUMBER = "01866464593"
+
+users_db = {}
+support_sessions = {}
+screenshot_registry = set()
+today_date = datetime.date.today()
+
+# --- SPECIAL OFFERS STATE ---
+ACTIVE_OFFER = None  
+OFFER_END_DATE = None
+
+# --- TASKS DATABASE ---
+FLAG_TASKS = [
+    {"flag": "🇦🇽", "q": "🇦🇽 Which country flag is this?", "options": ["Åland Islands", "Sweden", "Finland", "Norway"], "ans": "Åland Islands"},
+    {"flag": "🇧🇦", "q": "🇧🇦 Which country flag is this?", "options": ["Bosnia & Herzegovina", "Croatia", "Serbia", "Albania"], "ans": "Bosnia & Herzegovina"},
+    {"flag": "🇧🇩", "q": "🇧🇩 Which country flag is this?", "options": ["Bangladesh", "India", "Pakistan", "Nepal"], "ans": "Bangladesh"},
+    {"flag": "🇯🇵", "q": "🇯🇵 Which country flag is this?", "options": ["Japan", "China", "South Korea", "Vietnam"], "ans": "Japan"}
+]
+
+CURRENCY_MAP = {
+    "Bangladesh": {"symbol": "BDT", "rate": 1, "name": "টাকা"},
+    "India": {"symbol": "INR", "rate": 0.75, "name": "INR"},
+    "United States": {"symbol": "USD", "rate": 0.0085, "name": "USD"},
+    "China": {"symbol": "CNY", "rate": 0.061, "name": "CNY"}
+}
+
+LANGS = {
+    "en": {
+        "welcome": "✨🌟 Welcome to 𒆜𝐓𝐀𝐌𝐈𝐌 𝐋𝐄𝐀𝐃𝐄𝐑 𓊈𝐕𝐈𝐏™𓊉 Platform! 🌟✨\n\n💰 Earn cash rewards easily by solving Flag & Math tasks!\n🛡 *100% Safe, Secure & Government Licensed Platform!*",
+        "account": "🏆 Status: {status}\n👤 Name: {name}\n🆔 User ID: {uid}\n📍 Country: {country} {flag}\n💰 Balance: {bal} {curr}\n🔗 Referrals: {refs}\n✅ Tasks Solved: {captchas}",
+        "earn_text": "💸 VIP Earn Tasks Menu\n\nChoose an option below to start making money at lightning speed:",
+        "refer_text": "🔗 Refer & Earn Program\n\nInvite your friends and earn instant cash bonus!\n\n📌 Your Referral Link:\nhttps://t.me/Livecat2capcabot?start=ref_{uid}",
+        "withdraw_text": "🏛 Withdrawal Center\n\nCurrent Balance: *{bal} {curr}*\nMinimum Withdrawal: *100 {curr}*",
+        "btn_account": "🆔 Account", "btn_support": "💬 VIP Support 🔴",
+        "btn_withdraw": "🏛 Withdraw", "btn_group": "👥 Payment Group",
+        "btn_earn": "💸 Earn Tasks", "btn_refer": "🔗 Refer & Earn"
+    },
+    "bn": {
+        "welcome": "✨🌟 𒆜𝐓𝐀𝐌𝐈𝐌 𝐋𝐄𝐀𝐃𝐄𝐑 𓊈𝐕𝐈𝐏™𓊉 প্ল্যাটফর্মে স্বাগতম! 🌟✨\n\n💰 ফ্ল্যাগ কুইজ ও ম্যাথ টাস্ক পূরণ করে আনলিমিটেড টাকা ইনকাম করুন!\n🛡️ *১০০% বিশ্বস্ত ও পরীক্ষিত প্ল্যাটফর্ম!*",
+        "account": "🏆 স্ট্যাটাস: {status}\n👤 নাম: {name}\n🆔 ইউজার আইডি: {uid}\n📍 দেশ: {country} {flag}\n💰 ব্যালেন্স: {bal} {curr}\n🔗 রেফারেল: {refs}\n✅ সম্পন্ন টাস্ক: {captchas}",
+        "earn_text": "💸 ইনকাম টাস্ক মেনু\n\nখুব দ্রুত গতিতে কাজ সম্পন্ন করতে নিচের যেকোনো একটি সিলেক্ট করুন:",
+        "refer_text": "🔗 রেফার ও ইনকাম প্রোগ্রাম\n\nবন্ধুদের সাথে আপনার লিংক শেয়ার করুন এবং প্রতি রেফারে আকর্ষণীয় বোনাস জিতুন!\n\n📌 আপনার রেফারেল লিংক:\nhttps://t.me/Livecat2capcabot?start=ref_{uid}",
+        "withdraw_text": "🏛 উইথড্র মেনু\n\nআপনার বর্তমান ব্যালেন্স: *{bal} {curr}*\nন্যূনতম উইথড্র: *১০০ টাকা*\n\nউইথড্র করতে সাপোর্ট বা এডমিনের সাহায্য নিন।",
+        "btn_account": "🆔 অ্যাকাউন্ট", "btn_support": "💬 ভিপ সাপোর্ট 🔴",
+        "btn_withdraw": "🏛 উইথড্র", "btn_group": "👥 পেমেন্ট গ্রুপ",
+        "btn_earn": "💸 ইনকাম করুন", "btn_refer": "🔗 রেফার ও ইনকাম"
+    }
+}
+
+def detect_user_location(user_from):
+    lang_code = user_from.get("language_code", "bn")
+    if lang_code.startswith("hi"): return "India", "🇮🇳", "hi"
+    elif lang_code.startswith("zh"): return "China", "🇨🇳", "zh"
+    elif lang_code.startswith("en") and not lang_code.startswith("bn"): return "United States", "🇺🇸", "en"
+    else: return "Bangladesh", "🇧🇩", "bn"
+
+def get_user(user_id, user_from=None):
+    global today_date
+    if datetime.date.today() != today_date:
+        today_date = datetime.date.today()
+    if user_id not in users_db:
+        country, flag, lang = detect_user_location(user_from or {})
+        users_db[user_id] = {
+            "lang": lang, "country": country, "flag": flag,
+            "balance": 0.0, "referrals": 0, "captchas": 0,
+            "status": "Free Member ⚪", "current_task": None,
+            "correct_ans": None, "joined_date": datetime.date.today()
+        }
+    return users_db[user_id]
+
+def send_telegram(token, method, payload):
+    url = f"https://api.telegram.org/bot{token}/{method}"
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return json.loads(response.read().decode('utf-8'))
+    except Exception as e:
+        return {"ok": False}
+
+def edit_message_text(token, chat_id, message_id, text, reply_markup=None):
+    payload = {"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "Markdown"}
+    if reply_markup: payload["reply_markup"] = reply_markup
+    send_telegram(token, "editMessageText", payload)
+
+def answer_callback(token, callback_query_id, text="", show_alert=False):
+    payload = {"callback_query_id": callback_query_id, "text": text, "show_alert": show_alert}
+    send_telegram(token, "answerCallbackQuery", payload)
+
+def main_keyboard(lang="bn"):
+    l = LANGS.get(lang, LANGS["bn"])
+    return {
+        "inline_keyboard": [
+            [{"text": l["btn_account"], "callback_data": "account"}, {"text": l["btn_support"], "url": SUPPORT_BOT_LINK}],
+            [{"text": l["btn_withdraw"], "callback_data": "withdraw"}, {"text": l["btn_group"], "url": PAYMENT_GROUP}],
+            [{"text": l["btn_earn"], "callback_data": "earn"}, {"text": l["btn_refer"], "callback_data": "refer"}]
+        ]
+    }
+
+def back_keyboard(lang="bn"):
+    return {"inline_keyboard": [[{"text": "🔙 𒆜𝐓𝐀𝐌𝐈𝐌 𝐋𝐄𝐀𝐃𝐄𝐑™ Main Menu", "callback_data": "account"}]]}
+
+print("✨ 𒆜𝐓𝐀𝐌𝐈𝐌 𝐋𝐄𝐀𝐃𝐄𝐑 𓊈𝐕𝐈𝐏™𓊉 Earn & Support Bot running smoothly! 🚀")
+
+main_offset = 0
+support_offset = 0
+last_stats_broadcast = time.time()
+
+while True:
+    current_time = time.time()
+    
+    if ACTIVE_OFFER and OFFER_END_DATE and datetime.datetime.now() > OFFER_END_DATE:
+        ACTIVE_OFFER = None
+        OFFER_END_DATE = None
+
+    if current_time - last_stats_broadcast >= 300:
+        last_stats_broadcast = current_time
+        total_members = len(users_db)
+        active_workers = sum(1 for u in users_db.values() if u.get("current_task") is not None)
+        stats_msg = f"📊 𒆜𝐓𝐀𝐌𝐈𝐌 𝐋𝐄𝐀𝐃𝐄𝐑™ Live Statistics Report\n\n👥 Total Members: {total_members}\n⚡ Active Workers Online Now: {active_workers}"
+        send_telegram(MAIN_BOT_TOKEN, "sendMessage", {"chat_id": STATS_CHANNEL, "text": stats_msg, "parse_mode": "Markdown"})
+
+    try:
+        # --- 1. MAIN EARN BOT LOGIC ---
+        res = send_telegram(MAIN_BOT_TOKEN, "getUpdates", {"offset": main_offset, "timeout": 2})
+        if res.get("ok"):
+            for update in res.get("result", []):
+                main_offset = update["update_id"] + 1
+
+                if "message" in update:
+                    msg = update["message"]
+                    chat_id = msg["chat"]["id"]
+                    user_id = msg["from"]["id"]
+                    text = msg.get("text", "")
+                    user = get_user(user_id, msg["from"])
+                    l = LANGS.get(user["lang"], LANGS["bn"])
+
+                    if user_id == ADMIN_ID and text == "/অফার":
+                        ACTIVE_OFFER = "eid"
+                        OFFER_END_DATE = datetime.datetime.now() + datetime.timedelta(days=7)
+                        send_telegram(MAIN_BOT_TOKEN, "sendMessage", {"chat_id": chat_id, "text": "🌙 ঈদ মোবারক অফার ৭ দিনের জন্য চালু করা হয়েছে!"})
+                        continue
+
+                    if text.startswith("/start"):
+                        send_telegram(MAIN_BOT_TOKEN, "sendMessage", {
+                            "chat_id": chat_id, "text": l['welcome'],
+                            "reply_markup": main_keyboard(user["lang"]), "parse_mode": "Markdown"
+                        })
+                    
+                    elif user.get("current_task") == "math":
+                        correct = user.get("correct_ans")
+                        try:
+                            if int(text.strip()) == correct:
+                                reward = 10.0 if ACTIVE_OFFER else 2.0
+                                user["balance"] += reward
+                                user["captchas"] += 1
+                                user["current_task"] = None
+                                send_telegram(MAIN_BOT_TOKEN, "sendMessage", {
+                                    "chat_id": chat_id, "text": f"✅ সঠিক উত্তর! আপনার অ্যাকাউন্টে {reward} টাকা যোগ হয়েছে। 💰",
+                                    "reply_markup": main_keyboard(user["lang"]), "parse_mode": "Markdown"
+                                })
+                            else:
+                                send_telegram(MAIN_BOT_TOKEN, "sendMessage", {"chat_id": chat_id, "text": "❌ ভুল উত্তর! আবার সঠিক সংখ্যাটি লিখে পাঠান।", "parse_mode": "Markdown"})
+                        except:
+                            send_telegram(MAIN_BOT_TOKEN, "sendMessage", {"chat_id": chat_id, "text": "⚠️ অনুগ্রহ করে শুধু সঠিক সংখ্যাটি লিখুন।", "parse_mode": "Markdown"})
+
+                elif "callback_query" in update:
+                    cq = update["callback_query"]
+                    cq_id = cq["id"]
+                    data = cq["data"]
+                    user_id = cq["from"]["id"]
+                    chat_id = cq["message"]["chat"]["id"]
+                    msg_id = cq["message"]["message_id"]
+                    user = get_user(user_id, cq["from"])
+                    l = LANGS.get(user["lang"], LANGS["bn"])
+
+                    if data == "account":
+                        user["current_task"] = None
+                        acc_msg = l["account"].format(
+                            status=user["status"], name=cq["from"].get("first_name", "User"),
+                            uid=user_id, country=user["country"], flag=user["flag"],
+                            bal=user["balance"], curr="BDT", refs=user["referrals"], captchas=user["captchas"]
+                        )
+                        edit_message_text(MAIN_BOT_TOKEN, chat_id, msg_id, acc_msg, main_keyboard(user["lang"]))
+                        answer_callback(MAIN_BOT_TOKEN, cq_id)
+
+                    elif data == "earn":
+                        user["current_task"] = None
+                        earn_keyboard = {
+                            "inline_keyboard": [
+                                [{"text": "🏳️️ Flag Quiz Task", "callback_data": "task_flag"}, {"text": "➕ Math Task", "callback_data": "task_math"}],
+                                [{"text": "🔙 Main Menu", "callback_data": "account"}]
+                            ]
+                        }
+                        edit_message_text(MAIN_BOT_TOKEN, chat_id, msg_id, l["earn_text"], earn_keyboard)
+                        answer_callback(MAIN_BOT_TOKEN, cq_id)
+
+                    elif data == "task_math":
+                        num1 = random.randint(10, 99)
+                        num2 = random.randint(10, 99)
+                        user["correct_ans"] = num1 + num2
+                        user["current_task"] = "math"
+                        math_text = f"➕ Math Task:\n\nচ্যাট বক্সে নিচের যোগফল লিখে পাঠান:\n\n👉 {num1} + {num2} = ?"
+                        edit_message_text(MAIN_BOT_TOKEN, chat_id, msg_id, math_text, back_keyboard(user["lang"]))
+                        answer_callback(MAIN_BOT_TOKEN, cq_id, "Send the answer in chat!")
+
+        # --- 2. SUPPORT BOT LOGIC ---
+        sup_res = send_telegram(SUPPORT_BOT_TOKEN, "getUpdates", {"offset": support_offset, "timeout": 2})
+        if sup_res.get("ok"):
+            for update in sup_res.get("result", []):
+                support_offset = update["update_id"] + 1
+                if "message" in update:
+                    s_msg = update["message"]
+                    s_chat_id = s_msg["chat"]["id"]
+                    send_telegram(SUPPORT_BOT_TOKEN, "sendMessage", {"chat_id": s_chat_id, "text": "💬 সাপোর্ট সিস্টেমে স্বাগতম! আপনার সমস্যা এখানে বলুন।", "parse_mode": "Markdown"})
+
+    except Exception as e:
+        time.sleep(1)
